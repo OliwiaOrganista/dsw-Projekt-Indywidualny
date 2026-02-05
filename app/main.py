@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, Column, String, DateTime, Text, Integer
@@ -56,11 +56,8 @@ def get_db():
 
 # Endpoints
 @app.post("/files")
-async def upload_file(file: UploadFile = File(...), db: Session = None):
+async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Upload a file and queue it for processing"""
-    if db is None:
-        db = SessionLocal()
-    
     try:
         file_id = str(uuid.uuid4())
         content = await file.read()
@@ -87,75 +84,55 @@ async def upload_file(file: UploadFile = File(...), db: Session = None):
     except Exception as e:
         logger.error(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 
 @app.get("/files")
-async def list_files(skip: int = 0, limit: int = 10, db: Session = None):
+async def list_files(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     """List all uploaded files"""
-    if db is None:
-        db = SessionLocal()
-    
-    try:
-        files = db.query(FileRecord).offset(skip).limit(limit).all()
-        return [
-            {
-                "id": f.id,
-                "filename": f.filename,
-                "status": f.status,
-                "uploaded_at": f.uploaded_at.isoformat(),
-                "file_size": f.file_size
-            }
-            for f in files
-        ]
-    finally:
-        db.close()
+    files = db.query(FileRecord).offset(skip).limit(limit).all()
+    return [
+        {
+            "id": f.id,
+            "filename": f.filename,
+            "status": f.status,
+            "uploaded_at": f.uploaded_at.isoformat(),
+            "file_size": f.file_size
+        }
+        for f in files
+    ]
 
 @app.get("/files/{file_id}")
-async def get_file_status(file_id: str, db: Session = None):
+async def get_file_status(file_id: str, db: Session = Depends(get_db)):
     """Get file processing status"""
-    if db is None:
-        db = SessionLocal()
+    db_file = db.query(FileRecord).filter(FileRecord.id == file_id).first()
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found")
     
-    try:
-        db_file = db.query(FileRecord).filter(FileRecord.id == file_id).first()
-        if not db_file:
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        return {
-            "id": db_file.id,
-            "filename": db_file.filename,
-            "status": db_file.status,
-            "uploaded_at": db_file.uploaded_at.isoformat(),
-            "processed_at": db_file.processed_at.isoformat() if db_file.processed_at else None,
-            "file_size": db_file.file_size
-        }
-    finally:
-        db.close()
+    return {
+        "id": db_file.id,
+        "filename": db_file.filename,
+        "status": db_file.status,
+        "uploaded_at": db_file.uploaded_at.isoformat(),
+        "processed_at": db_file.processed_at.isoformat() if db_file.processed_at else None,
+        "file_size": db_file.file_size
+    }
 
 @app.get("/files/{file_id}/result")
-async def get_file_result(file_id: str, db: Session = None):
+async def get_file_result(file_id: str, db: Session = Depends(get_db)):
     """Get file processing result"""
-    if db is None:
-        db = SessionLocal()
+    db_file = db.query(FileRecord).filter(FileRecord.id == file_id).first()
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found")
     
-    try:
-        db_file = db.query(FileRecord).filter(FileRecord.id == file_id).first()
-        if not db_file:
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        if db_file.status != "done":
-            raise HTTPException(status_code=400, detail=f"File not processed yet (status: {db_file.status})")
-        
-        return {
-            "id": db_file.id,
-            "filename": db_file.filename,
-            "status": db_file.status,
-            "result": db_file.result,
-            "processed_at": db_file.processed_at.isoformat()
-        }
-    finally:
-        db.close()
+    if db_file.status != "done":
+        raise HTTPException(status_code=400, detail=f"File not processed yet (status: {db_file.status})")
+    
+    return {
+        "id": db_file.id,
+        "filename": db_file.filename,
+        "status": db_file.status,
+        "result": db_file.result,
+        "processed_at": db_file.processed_at.isoformat()
+    }
 
 @app.get("/health")
 async def health_check():
