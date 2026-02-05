@@ -1,3 +1,6 @@
+      - name: Show API logs
+        run: |
+          docker-compose logs api
 name: CD - App Health Check
 
 on:
