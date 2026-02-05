@@ -107,5 +107,4 @@ jobs:
           ghcr.io/${{ github.repository }}/worker:${{ github.sha }}
 
   validate-compose:
-    runs-on: ubuntu-latest
     uses: ./.github/workflows/validate-compose.yml
