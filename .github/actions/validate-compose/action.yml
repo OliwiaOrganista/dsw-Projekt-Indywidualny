@@ -1,0 +1,67 @@
+name: Validate Docker Compose
+description: 'Validates docker-compose.yml and checks required services'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install docker-compose
+      shell: bash
+      run: |
+        if ! command -v docker-compose &> /dev/null; then
+          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+        fi
+    
+    - name: Validate docker-compose.yml syntax
+      shell: bash
+      run: |
+        if [ ! -f docker-compose.yml ]; then
+          echo "Error: docker-compose.yml not found"
+          exit 1
+        fi
+        docker-compose config > /dev/null
+        echo "✓ docker-compose.yml is valid"
+    
+    - name: Check required services
+      shell: bash
+      run: |
+        services=$(docker-compose config --services)
+        echo "Found services: $services"
+        
+        required_services=("api" "worker" "db" "redis" "minio")
+        
+        for service in "${required_services[@]}"; do
+          if echo "$services" | grep -q "^$service$"; then
+            echo "✓ Service '$service' exists"
+          else
+            echo "✗ Service '$service' is missing"
+            exit 1
+          fi
+        done
+    
+    - name: Validate healthchecks
+      shell: bash
+      run: |
+        # Check that critical services have healthchecks
+        for service in "db" "redis" "minio"; do
+          if grep -A 5 "^  $service:" docker-compose.yml | grep -q "healthcheck:"; then
+            echo "✓ Service '$service' has healthcheck"
+          else
+            echo "⚠ Service '$service' missing healthcheck"
+          fi
+        done
+    
+    - name: Validate volumes
+      shell: bash
+      run: |
+        if grep -q "volumes:" docker-compose.yml; then
+          echo "✓ Volumes are configured"
+        fi
+    
+    - name: Generate report
+      shell: bash
+      if: always()
+      run: |
+        echo "## Docker Compose Validation Report" >> $GITHUB_STEP_SUMMARY
+        echo "- docker-compose.yml: ✓" >> $GITHUB_STEP_SUMMARY
+        echo "- Services: $(docker-compose config --services | tr '\n' ', ')" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,50 @@
+name: CD - Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to DigitalOcean
+      env:
+        DEPLOY_KEY: ${{ secrets.DIGITALOCEAN_PRIVATE_KEY }}
+        DEPLOY_HOST: ${{ secrets.DIGITALOCEAN_HOST }}
+        DEPLOY_USER: ${{ secrets.DIGITALOCEAN_USER }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H $DEPLOY_HOST >> ~/.ssh/known_hosts 2>/dev/null
+        
+        ssh -i ~/.ssh/deploy_key $DEPLOY_USER@$DEPLOY_HOST << 'EOF'
+        cd /app/file-ingestor
+        git pull origin main
+        docker-compose pull
+        docker-compose up -d
+        docker-compose exec -T db psql -U user -d filedb -c "SELECT version();" || true
+        EOF
+    
+    - name: Verify deployment
+      env:
+        DEPLOY_HOST: ${{ secrets.DIGITALOCEAN_HOST }}
+        DEPLOY_USER: ${{ secrets.DIGITALOCEAN_USER }}
+        DEPLOY_KEY: ${{ secrets.DIGITALOCEAN_PRIVATE_KEY }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H $DEPLOY_HOST >> ~/.ssh/known_hosts 2>/dev/null
+        
+        ssh -i ~/.ssh/deploy_key $DEPLOY_USER@$DEPLOY_HOST << 'EOF'
+        sleep 5
+        curl -f http://localhost:8000/health || exit 1
+        echo "Deployment successful!"
+        EOF

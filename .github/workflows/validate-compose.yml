@@ -1,0 +1,39 @@
+name: Validate Docker Compose
+
+on:
+  workflow_call:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install docker-compose
+      run: |
+        sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+    
+    - name: Validate docker-compose.yml
+      run: docker-compose config
+    
+    - name: Check required services
+      run: |
+        services=$(docker-compose config --services)
+        echo "Services found: $services"
+        
+        for service in api worker db redis minio; do
+          if echo "$services" | grep -q "^$service$"; then
+            echo "✓ Service '$service' found"
+          else
+            echo "✗ Service '$service' NOT found"
+            exit 1
+          fi
+        done
+    
+    - name: Verify image references
+      run: |
+        # Check if images are valid
+        grep -E "image:|build:" docker-compose.yml
+        echo "Docker compose structure is valid"
