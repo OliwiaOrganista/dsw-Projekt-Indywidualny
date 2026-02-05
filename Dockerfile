@@ -22,11 +22,12 @@ RUN pip install --user --no-cache-dir -r app_requirements.txt && \
 # Stage 2: API Runtime
 FROM python:3.11-slim as api
 
-WORKDIR /app
+WORKDIR /
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     postgresql-client \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies from builder
@@ -49,7 +50,7 @@ CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "
 # Stage 3: Worker Runtime
 FROM python:3.11-slim as worker
 
-WORKDIR /worker
+WORKDIR /
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -66,4 +67,4 @@ ENV PATH=/root/.local/bin:$PATH \
 # Copy worker code
 COPY worker /worker
 
-CMD ["celery", "-A", "tasks", "worker", "--loglevel=info"]
+CMD ["celery", "-A", "worker.tasks", "worker", "--loglevel=info"]
