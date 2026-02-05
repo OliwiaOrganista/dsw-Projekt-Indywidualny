@@ -22,7 +22,7 @@ RUN pip install --user --no-cache-dir -r app_requirements.txt && \
 # Stage 2: API Runtime
 FROM python:3.11-slim as api
 
-WORKDIR /
+WORKDIR /code
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -38,7 +38,7 @@ ENV PATH=/root/.local/bin:$PATH \
     PYTHONUNBUFFERED=1
 
 # Copy application code
-COPY app /app
+COPY app /code/app
 
 EXPOSE 8000
 
@@ -50,7 +50,7 @@ CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "
 # Stage 3: Worker Runtime
 FROM python:3.11-slim as worker
 
-WORKDIR /
+WORKDIR /code
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -65,6 +65,6 @@ ENV PATH=/root/.local/bin:$PATH \
     PYTHONUNBUFFERED=1
 
 # Copy worker code
-COPY worker /worker
+COPY worker /code/worker
 
 CMD ["celery", "-A", "worker.tasks", "worker", "--loglevel=info"]

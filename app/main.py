@@ -198,9 +198,10 @@ def process_file_task(file_id: str, filename: str, content: bytes):
 def process_file_content(filename: str, content: bytes) -> str:
     """Process file content based on type"""
     if filename.endswith('.txt'):
-        return f"Text file processed: {len(content)} bytes, lines: {content.count(b'\\n')}"
+        line_count = content.count(b'\n')
+        return f"Text file processed: {len(content)} bytes, lines: {line_count}"
     elif filename.endswith('.csv'):
-        lines = content.decode('utf-8').split('\\n')
+        lines = content.decode('utf-8').split('\n')
         return f"CSV file processed: {len(lines)} rows, size: {len(content)} bytes"
     elif filename.endswith('.json'):
         return f"JSON file processed: {len(content)} bytes"
