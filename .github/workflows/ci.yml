@@ -86,6 +86,10 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     
+    - name: Set lowercase repository name
+      id: repo
+      run: echo "repository=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+    
     - name: Build and push API image
       uses: docker/build-push-action@v5
       with:
@@ -93,8 +97,8 @@ jobs:
         target: api
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}/api:latest
-          ghcr.io/${{ github.repository }}/api:${{ github.sha }}
+          ghcr.io/${{ steps.repo.outputs.repository }}/api:latest
+          ghcr.io/${{ steps.repo.outputs.repository }}/api:${{ github.sha }}
     
     - name: Build and push Worker image
       uses: docker/build-push-action@v5
@@ -103,8 +107,8 @@ jobs:
         target: worker
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}/worker:latest
-          ghcr.io/${{ github.repository }}/worker:${{ github.sha }}
+          ghcr.io/${{ steps.repo.outputs.repository }}/worker:latest
+          ghcr.io/${{ steps.repo.outputs.repository }}/worker:${{ github.sha }}
 
   validate-compose:
     uses: ./.github/workflows/validate-compose.yml
