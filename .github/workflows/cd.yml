@@ -1,6 +1,4 @@
-      - name: Show API logs
-        run: |
-          docker-compose logs api
+
 name: CD - App Health Check
 
 on:
@@ -24,6 +22,10 @@ jobs:
           docker-compose build
           docker-compose up -d
           sleep 30
+
+      - name: Show API logs
+        run: |
+          docker-compose logs api
 
       - name: Health check API
         run: |
